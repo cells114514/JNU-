@@ -11,6 +11,7 @@ import time
 print("jwxk.py")
 
 STUDENT_CODE = "2024153253"  # 替换为实际的学生学号
+ELECTIVE_BATCH_CODE = "0b215876e50f4bd192016ad490e5ed4c"  # 替换为实际的选课批次代码
 
 def post_volunteer(payload: dict, token: str = None) -> requests.Response:
     """
@@ -137,14 +138,14 @@ if __name__ == "__main__":
     
     # 示例：志愿选课
     # teaching_class_id = input("选课id：")
-    teaching_class_id = ["2526207937", "2526207346"]  # 替换为实际的选课ID
+    teaching_class_id = ["2627104357"]  # 替换为实际的选课ID
     index = 0
     while True:
         volunteer_payload = {
             "data": {
                 "operationType": "1",
                 "studentCode": STUDENT_CODE,
-                "electiveBatchCode": "cae3fa85f0614eccadc250aee72c20c7",
+                "electiveBatchCode": ELECTIVE_BATCH_CODE,   # 此处改成了一个全局变量，以便修改
                 "teachingClassId": teaching_class_id[index % len(teaching_class_id)],
                 "isMajor": "1",
                 "campus": "1",

@@ -63,7 +63,24 @@ STUDENT_CODE = "你的学号"
 teaching_class_id = ["2526207937", "2526207346"]
 ```
 
-### 3. 启动抢课循环
+**注意**
+新发现到选课批次的code每学期会变化，目前临时的解决方法是在选课时间前按F12到网络选项卡然后在浏览器页面按下选课按钮观察发出的包与jwxk.py中的以下代码段有何异同：
+```python
+        volunteer_payload = {
+            "data": {
+                "operationType": "1",
+                "studentCode": STUDENT_CODE,
+                "electiveBatchCode": ELECTIVE_BATCH_CODE,   # 此处改成了一个全局变量，以便修改
+                "teachingClassId": teaching_class_id[index % len(teaching_class_id)],
+                "isMajor": "1",
+                "campus": "1",
+                "teachingClassType": "QXKC"
+            }
+        }
+```
+如有不同，请自行修改。
+
+### 3. 启动选课循环
 
 ```bash
 python jwxk.py
@@ -74,6 +91,8 @@ python jwxk.py
 - 按课程 ID 列表轮询提交（每秒一次）。
 - 输出状态码和接口返回。
 - 将最新返回覆盖写入 `volunteer_response.json`。
+
+**验证**：若在选课时间前运行，发现返回的信息是“当前时间不在选课开放时间范围内”，则证明你的脚本已经准备好了。如果返回了其他值，请检查设置是否正确。
 
 ## 返回码与常见提示
 
