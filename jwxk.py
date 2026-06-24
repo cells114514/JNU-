@@ -10,8 +10,39 @@ import time
 
 print("jwxk.py")
 
-STUDENT_CODE = "2024153253"  # 替换为实际的学生学号
-ELECTIVE_BATCH_CODE = "0b215876e50f4bd192016ad490e5ed4c"  # 替换为实际的选课批次代码
+BASE_DIR = os.path.dirname(__file__)
+
+
+def _path(filename):
+    return os.path.join(BASE_DIR, filename)
+
+
+def load_student_code():
+    """从 student_info.json 加载学号"""
+    filepath = _path("student_info.json")
+    if os.path.exists(filepath):
+        with open(filepath, "r", encoding="utf-8") as f:
+            info = json.load(f)
+        code = info.get("code")
+        if code:
+            print(f"已从 student_info.json 加载学号: {code}")
+            return code
+    print("警告: 未找到 student_info.json，请先运行 get_cookies.py")
+    return None
+
+
+def load_course_batch_mapping():
+    """从 course_batch.json 加载 教学班ID → 批次码 的映射"""
+    filepath = _path("course_batch.json")
+    if os.path.exists(filepath):
+        with open(filepath, "r", encoding="utf-8") as f:
+            mapping = json.load(f)
+        print(f"已从 course_batch.json 加载 {len(mapping)} 个课程批次映射:")
+        for cid, batch in mapping.items():
+            print(f"  {cid} → {batch}")
+        return mapping
+    print("警告: 未找到 course_batch.json")
+    return {}
 
 def post_volunteer(payload: dict, token: str = None) -> requests.Response:
     """
@@ -127,32 +158,53 @@ def post_volunteer(payload: dict, token: str = None) -> requests.Response:
     except ValueError:
         pass
     
-    # 保存返回结果
-    with open("volunteer_response.json", "a", encoding="utf-8") as f:
-        f.write(resp.text)
-    print("返回结果已保存到 volunteer_response.json")
+    # 保存返回结果（JSONL 格式：每行一条完整的 JSON 记录）
+    try:
+        record = resp.json()
+    except ValueError:
+        record = {"_raw": resp.text, "_status": resp.status_code}
+    record["_timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
+    with open("volunteer_response.jsonl", "a", encoding="utf-8") as f:
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    print("返回结果已保存到 volunteer_response.jsonl")
     
     return resp
 
 if __name__ == "__main__":
-    
-    # 示例：志愿选课
-    # teaching_class_id = input("选课id：")
-    teaching_class_id = ["2627104357"]  # 替换为实际的选课ID
+    # 从 student_info.json 加载学号（不再硬编码）
+    student_code = load_student_code()
+    if not student_code:
+        print("错误: 无法加载学号，请先运行 get_cookies.py 获取 student_info.json")
+        exit(1)
+
+    # 从 course_batch.json 加载 教学班ID → 批次码 映射
+    course_batch = load_course_batch_mapping()
+    if not course_batch:
+        print("错误: course_batch.json 为空或不存在")
+        print("请创建 course_batch.json，格式: {\"教学班ID\": \"批次码\", ...}")
+        print("批次码可从 student_info.json 的 electiveBatchList 中查找")
+        exit(1)
+
+    teaching_class_ids = list(course_batch.keys())
+    print(f"\n将轮询以下 {len(teaching_class_ids)} 个课程:")
+
     index = 0
     while True:
+        cid = teaching_class_ids[index % len(teaching_class_ids)]
+        batch_code = course_batch[cid]
+
         volunteer_payload = {
             "data": {
                 "operationType": "1",
-                "studentCode": STUDENT_CODE,
-                "electiveBatchCode": ELECTIVE_BATCH_CODE,   # 此处改成了一个全局变量，以便修改
-                "teachingClassId": teaching_class_id[index % len(teaching_class_id)],
+                "studentCode": student_code,
+                "electiveBatchCode": batch_code,
+                "teachingClassId": cid,
                 "isMajor": "1",
                 "campus": "1",
                 "teachingClassType": "QXKC"
             }
         }
-        
+
         volunteer_resp = post_volunteer(volunteer_payload)
         index += 1
         time.sleep(1)  # 每秒发送一次请求，避免过快导致被封禁

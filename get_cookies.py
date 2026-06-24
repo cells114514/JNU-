@@ -194,6 +194,112 @@ def load_token_from_file():
         return None
 
 
+def extract_student_code_from_page(driver):
+    """尝试从页面提取学号（匹配 /student/XXXXXXXXX.do 模式的URL）"""
+    try:
+        page_source = driver.page_source
+        match = re.search(r'/student/(\d{10})\.do', page_source)
+        if match:
+            return match.group(1)
+    except Exception:
+        pass
+    return None
+
+
+def fetch_student_info(session, headers, student_code):
+    """获取学生基础信息，包括选课轮次列表"""
+    url = f"https://jwxk.jnu.edu.cn/xsxkapp/sys/xsxkapp/student/{student_code}.do?timestamp=1"
+    resp = session.get(url, headers=headers, allow_redirects=False, timeout=15)
+    print(f"学生信息接口状态码: {resp.status_code}")
+    if resp.status_code == 200:
+        try:
+            data = resp.json()
+            if data.get("code") == "1":
+                return data.get("data")
+            else:
+                print(f"获取学生信息失败: {data.get('msg')}")
+        except ValueError:
+            print("学生信息接口返回非JSON格式")
+    return None
+
+
+def save_student_info(info: dict) -> bool:
+    """保存学生信息到 student_info.json"""
+    if info:
+        filepath = _path_in_script_dir("student_info.json")
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(info, f, indent=2, ensure_ascii=False)
+        print(f"学生信息已保存到 student_info.json")
+        return True
+    return False
+
+
+def print_elective_batch_summary(batch_list: list):
+    """打印选课轮次摘要"""
+    if not batch_list:
+        return
+    print("\n" + "=" * 60)
+    print("可用选课轮次:")
+    print("=" * 60)
+    for batch in batch_list:
+        print(f"  名称: {batch.get('name')}")
+        print(f"  类型: {batch.get('typeName')} ({batch.get('tacticName')})")
+        print(f"  学期: {batch.get('schoolTermName')}")
+        print(f"  时间: {batch.get('beginTime')} ~ {batch.get('endTime')}")
+        print(f"  批次码: {batch.get('code')}")
+        print(f"  开放: {'是' if batch.get('isOpen') == '1' else '否'}")
+        print("-" * 60)
+
+
+def _build_session_with_auth(cookie_dict: dict, token: str) -> requests.Session:
+    """用 cookies 和 token 构建一个已认证的 requests.Session"""
+    session = requests.Session()
+    cleaned = {k: v for k, v in (cookie_dict or {}).items() if k}
+    cleaned["token"] = token
+    session.cookies.update(cleaned)
+    return session
+
+
+def _fetch_and_save_student_info(cookie_dict: dict, token: str, driver=None):
+    """获取并保存学生信息（在登录成功后调用）。
+
+    尝试从页面自动提取学号，失败则让用户手动输入。
+    """
+    student_code = None
+    if driver is not None:
+        student_code = extract_student_code_from_page(driver)
+        if student_code:
+            print(f"从页面自动提取到学号: {student_code}")
+
+    if not student_code:
+        student_code = input("请输入你的学号: ").strip()
+
+    if not student_code:
+        print("未输入学号，跳过学生信息获取。")
+        return
+
+    session = _build_session_with_auth(cookie_dict, token)
+    headers = {
+        "User-Agent": "Mozilla/5.0",
+        "Accept": "application/json, text/javascript, */*; q=0.01",
+        "X-Requested-With": "XMLHttpRequest",
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "token": token,
+        "language": "zh_cn",
+        "Origin": "https://jwxk.jnu.edu.cn",
+        "Referer": f"https://jwxk.jnu.edu.cn/xsxkapp/sys/xsxkapp/*default/grablessons.do?token={token}",
+    }
+    info = fetch_student_info(session, headers, student_code)
+    if info:
+        save_student_info(info)
+        print(f"  姓名: {info.get('name')}")
+        print(f"  学号: {info.get('code')}")
+        print(f"  学院: {info.get('collegeName')}")
+        print(f"  专业: {info.get('departmentName')}")
+        print(f"  年级: {info.get('grade')}")
+        print_elective_batch_summary(info.get('electiveBatchList'))
+
+
 def get_cookies_manual():
     """手动获取cookies：打开浏览器，用户登录后获取cookies和token"""
     chrome_options = Options()
@@ -257,9 +363,13 @@ def get_cookies_manual():
         print("\ncookies已保存到 cookies.json 文件")
 
         save_token(token)
-        
+
+        # 获取并保存学生信息（含选课轮次列表）
+        print("\n正在获取学生信息...")
+        _fetch_and_save_student_info(cookie_dict, token, driver=driver)
+
         return cookie_dict, token
-        
+
     finally:
         print("\n按回车键关闭浏览器...")
         input()
@@ -349,9 +459,13 @@ def get_cookies_with_login(username, password):
         print("\ncookies已保存到 cookies.json 文件")
 
         save_token(token)
-        
+
+        # 获取并保存学生信息（含选课轮次列表）
+        print("\n正在获取学生信息...")
+        _fetch_and_save_student_info(cookie_dict, token, driver=driver)
+
         return cookie_dict, token
-        
+
     finally:
         time.sleep(2)
         driver.quit()

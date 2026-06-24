@@ -1,4 +1,9 @@
 # Script-generated runtime files
 cookies.json
 token.json
-volunteer_response.json
+volunteer_response.jsonl
+student_info.json
+course_batch.json
+班号记录.txt
+请求表单.txt
+CLAUDE.md
