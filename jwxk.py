@@ -121,7 +121,7 @@ def post_volunteer(payload: dict, token: str = None) -> requests.Response:
 
     # 先检查会话是否有效，避免把未登录误判成身份不一致
     check_url = "https://jwxk.jnu.edu.cn/xsxkapp/sys/xsxkapp/elective/volunteered.do?timestamp=1"
-    check_resp = session.get(check_url, allow_redirects=False)
+    check_resp = session.get(check_url, allow_redirects=False, timeout=1)
     if check_resp.status_code == 200:
         try:
             check_json = check_resp.json()
@@ -144,12 +144,19 @@ def post_volunteer(payload: dict, token: str = None) -> requests.Response:
     print(f"token值: '{token}'")
     print(f"addParam值: {add_param_value}")
     
-    # 发送表单格式的请求
-    resp = session.post(url, data=request_data, headers={
-        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
-    })
-    print(f"志愿选课状态码: {resp.status_code}")
-    print(f"返回值: {resp.text}")
+    # 发送表单格式的请求（超时 1 秒即放弃，进入下一轮）
+    try:
+        resp = session.post(url, data=request_data, headers={
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
+        }, timeout=1)
+        print(f"志愿选课状态码: {resp.status_code}")
+        print(f"返回值: {resp.text}")
+    except requests.exceptions.Timeout:
+        print("请求超时（1秒），放弃本次请求，继续下一轮")
+        return None
+    except requests.exceptions.RequestException as e:
+        print(f"请求异常: {e}，放弃本次请求，继续下一轮")
+        return None
 
     try:
         result = resp.json()
@@ -157,7 +164,7 @@ def post_volunteer(payload: dict, token: str = None) -> requests.Response:
             print("提示: 该提示也可能由登录态异常触发，请优先确认是否已成功登录选课系统。")
     except ValueError:
         pass
-    
+
     # 保存返回结果（JSONL 格式：每行一条完整的 JSON 记录）
     try:
         record = resp.json()
@@ -167,7 +174,7 @@ def post_volunteer(payload: dict, token: str = None) -> requests.Response:
     with open("volunteer_response.jsonl", "a", encoding="utf-8") as f:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
     print("返回结果已保存到 volunteer_response.jsonl")
-    
+
     return resp
 
 if __name__ == "__main__":
@@ -189,22 +196,25 @@ if __name__ == "__main__":
     print(f"\n将轮询以下 {len(teaching_class_ids)} 个课程:")
 
     index = 0
-    while True:
-        cid = teaching_class_ids[index % len(teaching_class_ids)]
-        batch_code = course_batch[cid]
+    try:
+        while True:
+            cid = teaching_class_ids[index % len(teaching_class_ids)]
+            batch_code = course_batch[cid]
 
-        volunteer_payload = {
-            "data": {
-                "operationType": "1",
-                "studentCode": student_code,
-                "electiveBatchCode": batch_code,
-                "teachingClassId": cid,
-                "isMajor": "1",
-                "campus": "1",
-                "teachingClassType": "QXKC"
+            volunteer_payload = {
+                "data": {
+                    "operationType": "1",
+                    "studentCode": student_code,
+                    "electiveBatchCode": batch_code,
+                    "teachingClassId": cid,
+                    "isMajor": "1",
+                    "campus": "1",
+                    "teachingClassType": "QXKC"
+                }
             }
-        }
 
-        volunteer_resp = post_volunteer(volunteer_payload)
-        index += 1
-        time.sleep(1)  # 每秒发送一次请求，避免过快导致被封禁
+            volunteer_resp = post_volunteer(volunteer_payload)
+            index += 1
+            time.sleep(1)  # 每秒发送一次请求，避免过快导致被封禁
+    except KeyboardInterrupt:
+        print(f"\n\n已终止，共发送 {index} 次请求。")
