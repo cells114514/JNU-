@@ -9,6 +9,8 @@
 
 - `get_cookies.py`：获取并校验登录态 + 学生信息。
 - `jwxk.py`：发送志愿选课请求。
+- `query_course.py`：查询可选课程（按筛选条件搜索）。
+- `query_selected.py`：查询已选课程（当前学期所有已中选的课）。
 
 （脚本生成的文件）
 - `cookies.json`：登录后保存的 cookies。
@@ -84,6 +86,58 @@ python jwxk.py
 在选课时间前按照步骤开始选课后，如果`msg`显示"当前时间不在选课开放时间范围内"，则表示脚本已正常运作。如果显示其他，请检查你的设置。
 
 
+## 其他脚本说明
+
+### 查询可选课程（`query_course.py`）
+
+按筛选条件搜索当前可选课程，用于选课前浏览课程信息、查看容量和冲突情况。
+
+```bash
+python query_course.py                     # 使用 query_config.json 中的配置
+python query_course.py "大学生职业生涯规划"   # 命令行指定搜索关键词
+python query_course.py --page 1            # 查询第 2 页（页码从 0 开始）
+```
+
+**前置条件**：先运行 `get_cookies.py` 登录，确保 `cookies.json`、`token.json`、`student_info.json` 存在。
+
+**配置文件 `query_config.json`**（仓库中已有示例）：
+
+```json
+{
+  "electiveBatchCode": "d7d8c03b35884aa88ae2b9887f4f8a51",
+  "isMajor": "1",
+  "campus": "",
+  "teachingClassType": "QXKC",
+  "filters": {
+    "KCXF": "0.5",
+    "SKXQ": "1"
+  },
+  "pageSize": "10",
+  "pageNumber": "0"
+}
+```
+
+- `electiveBatchCode`：选课批次码，来自 `student_info.json` → `electiveBatchList`。
+- `isMajor`：`"1"` 为专业课，`"0"` 为通选课。
+- `filters`：筛选条件，如 `KCXF`（课程学分）、`SKXQ`（上课校区）、`KKDWDM`（开课单位）等，值为中文名时会自动通过 `SXDM.json` 转码（这个转码字典映射还没有完善，慎用）。
+- `searchName`：搜索关键词（命令行为准，配置文件中的会被覆盖）。
+
+**建议优先使用配置文件查询**
+结果保存到 `query_results/` 文件夹，包含完整 JSON 和可读文本日志。
+
+### 查询已选课程（`query_selected.py`）
+
+查询当前学期所有已中选的课程（按选课批次分别查询），用于确认选课结果。
+
+```bash
+python query_selected.py
+```
+
+**前置条件**：先运行 `get_cookies.py` 登录，确保 `cookies.json`、`token.json`、`student_info.json` 存在。
+
+脚本会自动遍历 `student_info.json` 中的所有选课批次，对每个批次查询已中选课程并汇总。结果保存到 `selected_results/` 文件夹，包含完整 JSON 和按批次汇总的可读文本日志。
+
+
 ## 返回码与常见提示
 
 - `code = "2"` 且 `msg` 类似"该课程已经存在选课结果中"：表示该课已在你的结果里。
@@ -108,4 +162,6 @@ python jwxk.py
 - `cookies.json`、`token.json`、`student_info.json` 属于敏感凭据和个人信息，不要外传。
 - 目前尚不清楚请求间隔过短会不会被限制，调节间隔需谨慎，后果自付。
 - 本脚本仅供学习与个人使用，请遵守学校选课系统相关规定，严禁用于任何形式的商业用途。
-- 脚本有随时过期无法使用的风险，不一定保证可以使用。作者很懒，不会定期更新，每次使用前请自行检查脚本是否正常运作。
+- 脚本有随时过期无法使用的风险，不一定保证可以使用。每次使用前请自行检查脚本是否正常运作。
+- **如果你发现了bug**，你可以提issue告诉作者，作者可能会不定期查看（即使作者可能不会怎么修）。
+

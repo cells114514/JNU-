@@ -171,6 +171,7 @@ def post_volunteer(payload: dict, token: str = None) -> requests.Response:
     except ValueError:
         record = {"_raw": resp.text, "_status": resp.status_code}
     record["_timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
+    record["_teachingClassId"] = payload.get("data", {}).get("teachingClassId", "")
     with open("volunteer_response.jsonl", "a", encoding="utf-8") as f:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
     print("返回结果已保存到 volunteer_response.jsonl")

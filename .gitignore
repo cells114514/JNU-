@@ -4,6 +4,9 @@ token.json
 volunteer_response.jsonl
 student_info.json
 course_batch.json
+query_results/
+selected_results/
 班号记录.txt
 请求表单.txt
 CLAUDE.md
+index.html

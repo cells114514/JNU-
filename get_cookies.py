@@ -195,9 +195,14 @@ def load_token_from_file():
 
 
 def extract_student_code_from_page(driver):
-    """尝试从页面提取学号（匹配 /student/XXXXXXXXX.do 模式的URL）"""
+    """尝试从页面提取学号（优先匹配 var uid，fallback 匹配 /student/XXXXXXXXX.do URL）"""
     try:
         page_source = driver.page_source
+        # 优先：从 JS 变量 var uid = 'XXXXXXXXXX' 提取
+        match = re.search(r"var\s+uid\s*=\s*'(\d{10})'", page_source)
+        if match:
+            return match.group(1)
+        # 备用：从 /student/XXXXXXXXXX.do 模式的 URL 提取
         match = re.search(r'/student/(\d{10})\.do', page_source)
         if match:
             return match.group(1)
@@ -376,99 +381,99 @@ def get_cookies_manual():
         driver.quit()
 
 
-def get_cookies_with_login(username, password):
-    """自动登录获取cookies和token（需要根据实际登录页面调整）"""
-    chrome_options = Options()
-    chrome_options.add_argument("--start-maximized")
+# def get_cookies_with_login(username, password):
+#     """自动登录获取cookies和token（需要根据实际登录页面调整）"""
+#     chrome_options = Options()
+#     chrome_options.add_argument("--start-maximized")
     
-    driver = webdriver.Chrome(options=chrome_options)
+#     driver = webdriver.Chrome(options=chrome_options)
     
-    try:
-        url = "https://jwxk.jnu.edu.cn/xsxkapp/sys/xsxkapp/*default/index.do"
-        print(f"正在打开浏览器: {url}")
-        driver.get(url)
+#     try:
+#         url = "https://jwxk.jnu.edu.cn/xsxkapp/sys/xsxkapp/*default/index.do"
+#         print(f"正在打开浏览器: {url}")
+#         driver.get(url)
         
-        wait = WebDriverWait(driver, 10)
+#         wait = WebDriverWait(driver, 10)
         
-        print("\n尝试自动登录...")
-        print("注意：如果登录页面结构变化，需要调整选择器")
+#         print("\n尝试自动登录...")
+#         print("注意：如果登录页面结构变化，需要调整选择器")
         
-        try:
-            username_input = wait.until(
-                EC.presence_of_element_located((By.NAME, "username"))
-            )
-            password_input = driver.find_element(By.NAME, "password")
-            login_button = driver.find_element(By.XPATH, "//button[contains(text(), '登录') or @type='submit']")
+#         try:
+#             username_input = wait.until(
+#                 EC.presence_of_element_located((By.NAME, "username"))
+#             )
+#             password_input = driver.find_element(By.NAME, "password")
+#             login_button = driver.find_element(By.XPATH, "//button[contains(text(), '登录') or @type='submit']")
             
-            username_input.send_keys(username)
-            password_input.send_keys(password)
-            login_button.click()
+#             username_input.send_keys(username)
+#             password_input.send_keys(password)
+#             login_button.click()
             
-            print("等待登录完成...")
-            time.sleep(3)
+#             print("等待登录完成...")
+#             time.sleep(3)
             
-        except Exception as e:
-            print(f"自动登录失败: {e}")
-            print("请手动完成登录后按回车键继续...")
-            input()
+#         except Exception as e:
+#             print(f"自动登录失败: {e}")
+#             print("请手动完成登录后按回车键继续...")
+#             input()
         
-        cookies = driver.get_cookies()
+#         cookies = driver.get_cookies()
 
-        cookie_dict = {}
-        for cookie in cookies:
-            cookie_dict[cookie['name']] = cookie['value']
+#         cookie_dict = {}
+#         for cookie in cookies:
+#             cookie_dict[cookie['name']] = cookie['value']
         
-        print("\n正在尝试自动提取token...")
-        candidates = collect_token_candidates(driver)
-        token = candidates[0][1] if candidates else None
-        if token:
-            print(f"候选token数量: {len(candidates)}")
-            for source, t in candidates:
-                print(f"- {source}: {t}")
+#         print("\n正在尝试自动提取token...")
+#         candidates = collect_token_candidates(driver)
+#         token = candidates[0][1] if candidates else None
+#         if token:
+#             print(f"候选token数量: {len(candidates)}")
+#             for source, t in candidates:
+#                 print(f"- {source}: {t}")
         
-        if not token:
-            print("\n未自动提取到token，请手动输入token（可选，按回车跳过）:")
-            manual_token = input().strip()
-            if manual_token:
-                token = manual_token
-                candidates = [("手动输入", token)]
+#         if not token:
+#             print("\n未自动提取到token，请手动输入token（可选，按回车跳过）:")
+#             manual_token = input().strip()
+#             if manual_token:
+#                 token = manual_token
+#                 candidates = [("手动输入", token)]
 
-        if token and not candidates:
-            candidates = [("默认候选", token)]
+#         if token and not candidates:
+#             candidates = [("默认候选", token)]
 
-        valid_token = None
-        for source, candidate in candidates:
-            ok, message = validate_login_state(cookie_dict, candidate)
-            print(f"\n校验token[{source}]={candidate} -> {message}")
-            if ok:
-                valid_token = candidate
-                break
+#         valid_token = None
+#         for source, candidate in candidates:
+#             ok, message = validate_login_state(cookie_dict, candidate)
+#             print(f"\n校验token[{source}]={candidate} -> {message}")
+#             if ok:
+#                 valid_token = candidate
+#                 break
 
-        token = valid_token
+#         token = valid_token
         
-        if not token:
-            print("提示: 当前登录态无效，未保存 cookies/token。请确认进入选课系统后重试。")
-            return cookie_dict, None
+#         if not token:
+#             print("提示: 当前登录态无效，未保存 cookies/token。请确认进入选课系统后重试。")
+#             return cookie_dict, None
 
-        print("\n获取到的cookies:")
-        print(json.dumps(cookie_dict, indent=2, ensure_ascii=False))
+#         print("\n获取到的cookies:")
+#         print(json.dumps(cookie_dict, indent=2, ensure_ascii=False))
 
-        with open(_path_in_script_dir("cookies.json"), "w", encoding="utf-8") as f:
-            json.dump(cookie_dict, f, indent=2, ensure_ascii=False)
+#         with open(_path_in_script_dir("cookies.json"), "w", encoding="utf-8") as f:
+#             json.dump(cookie_dict, f, indent=2, ensure_ascii=False)
 
-        print("\ncookies已保存到 cookies.json 文件")
+#         print("\ncookies已保存到 cookies.json 文件")
 
-        save_token(token)
+#         save_token(token)
 
-        # 获取并保存学生信息（含选课轮次列表）
-        print("\n正在获取学生信息...")
-        _fetch_and_save_student_info(cookie_dict, token, driver=driver)
+#         # 获取并保存学生信息（含选课轮次列表）
+#         print("\n正在获取学生信息...")
+#         _fetch_and_save_student_info(cookie_dict, token, driver=driver)
 
-        return cookie_dict, token
+#         return cookie_dict, token
 
-    finally:
-        time.sleep(2)
-        driver.quit()
+#     finally:
+#         time.sleep(2)
+#         driver.quit()
 
 
 def load_cookies_from_file():
