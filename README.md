@@ -11,6 +11,8 @@
 - `jwxk.py`：发送志愿选课请求。
 - `query_course.py`：查询可选课程（按筛选条件搜索）。
 - `query_selected.py`：查询已选课程（当前学期所有已中选的课）。
+- `export_schedule_pdf.py`：将课表 JSON 导出为单页 PDF 课表。
+- `export_schedule_excel.py`：按指定教学周导出可视化 Excel 课表。
 
 （脚本生成的文件）
 - `cookies.json`：登录后保存的 cookies。
@@ -30,7 +32,7 @@
 Python 依赖：
 
 ```bash
-pip install requests selenium
+pip install requests selenium openpyxl reportlab
 ```
 
 说明：
@@ -137,6 +139,18 @@ python query_selected.py
 
 脚本会自动遍历 `student_info.json` 中的所有选课批次，对每个批次查询已中选课程并汇总。结果保存到 `selected_results/` 文件夹，包含完整 JSON 和按批次汇总的可读文本日志。
 
+### 导出完整学期的 Excel 课表（`export_schedule_excel.py`）
+
+根据课表 JSON 中的周次位串，在同一个 Excel 文件中生成每个教学周的独立工作表，可处理单双周和非每周课程：
+
+```bash
+python export_schedule_excel.py
+```
+
+脚本默认读取 `selected_results/` 下最新的 `selected_courses_*.json`，自动识别实际周数，生成
+`selected_results/course_schedule_all_weeks.xlsx`。每个工作表对应一周，最后附带全部课程明细。
+如果需要覆盖自动识别的周数，可以使用 `--week-count 18`。
+
 
 ## 返回码与常见提示
 
@@ -164,4 +178,3 @@ python query_selected.py
 - 本脚本仅供学习与个人使用，请遵守学校选课系统相关规定，严禁用于任何形式的商业用途。
 - 脚本有随时过期无法使用的风险，不一定保证可以使用。每次使用前请自行检查脚本是否正常运作。
 - **如果你发现了bug**，你可以提issue告诉作者，作者可能会不定期查看（即使作者可能不会怎么修）。
-
